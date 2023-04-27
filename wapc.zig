@@ -1,5 +1,5 @@
-extern "wapc" fn __guest_request(operation_ptr: [*]u8, payload_ptr: [*]u8) void;
-extern "wapc" fn __guest_response(ptr: [*]u8, len: usize) void;
+extern "wapc" fn __guest_request(operation_ptr: [*]u8, payload_ptr: ?[*]u8) void;
+extern "wapc" fn __guest_response(ptr: ?[*]u8, len: usize) void;
 extern "wapc" fn __guest_error(ptr: [*]u8, len: usize) void;
 
 extern "wapc" fn __host_call(binding_ptr: [*]const u8, binding_len: usize, namespace_ptr: [*]const u8, namespace_len: usize, operation_ptr: [*]const u8, operation_len: usize, payload_ptr: [*]const u8, payload_len: usize) bool;
@@ -43,7 +43,11 @@ pub fn handleCall(allocator: mem.Allocator, operation_size: usize, payload_size:
     var payload_buf = allocator.alloc(u8, payload_size) catch return false;
     defer allocator.free(payload_buf);
 
-    __guest_request(operation_buf.ptr, payload_buf.ptr);
+    if (payload_size > 0) {
+        __guest_request(operation_buf.ptr, payload_buf.ptr);
+    } else {
+        __guest_request(operation_buf.ptr, null);
+    }
 
     inline for (fns) |function| {
         if (mem.eql(u8, operation_buf, function.name)) {
@@ -55,7 +59,7 @@ pub fn handleCall(allocator: mem.Allocator, operation_size: usize, payload_size:
                 defer allocator.free(response);
                 __guest_response(response.ptr, response.len);
             } else {
-                __guest_response(@intToPtr([*]u8, 1), 0);
+                __guest_response(null, 0);
             }
             return true;
         }
